@@ -1,7 +1,13 @@
 from app.chains.prompts import meal_to_ingredients_chain, ingredients_to_meals_chain, meals_and_ingredients_chain
 
+
 def classify_intent(state: dict) -> dict:
-    state["intent"] = state.get("mode", "propose_meal")
+    if state.get("meal"):
+        state["intent"] = "meal_to_ingredients"
+    elif state.get("ingredients"):
+        state["intent"] = "ingredients_to_meals"
+    else:
+        state["intent"] = state.get("mode", "propose_meal")
     return state
 
 def handle_meal_to_ingredients(state: dict) -> dict:
