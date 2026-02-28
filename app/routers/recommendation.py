@@ -1,27 +1,41 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Literal
-from app.graph.workflow import recommendation_graph
+from typing import List, Optional
+from langchain_core.messages import HumanMessage, AIMessage
+from app.chains.prompts import chat_chain
 
 router = APIRouter()
 
-class RecommendationRequest(BaseModel):
-    mode: Literal["meal_to_ingredients", "ingredients_to_meals", "propose_meal"] = "propose_meal"
-    meal: Optional[str] = None
-    ingredients: Optional[List[str]] = None
+class Message(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
 
-@router.post("/recommend")
-async def recommend(request: RecommendationRequest):
-    if request.mode == "meal_to_ingredients" and not request.meal:
-        raise HTTPException(status_code=400, detail="Provide a meal name for this mode")
-    if request.mode == "ingredients_to_meals" and not request.ingredients:
-        raise HTTPException(status_code=400, detail="Provide ingredients for this mode")
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[Message]] = []
 
-    initial_state = {
-        "mode": request.mode,
-        "meal": request.meal,
-        "ingredients": request.ingredients,
-    }
+def build_history(history: List[Message]):
+    result = []
+    for msg in history:
+        if msg.role == "user":
+            result.append(HumanMessage(content=msg.content))
+        else:
+            result.append(AIMessage(content=msg.content))
+    return result
 
-    result = recommendation_graph.invoke(initial_state)
-    return result["response"]
+async def stream_response(message: str, history: List[Message]):
+    lc_history = build_history(history)
+    async for chunk in chat_chain.astream({
+        "input": message,
+        "history": lc_history
+    }):
+        if chunk.content:
+            yield chunk.content
+
+@router.post("/chat")
+async def chat(request: ChatRequest):
+    return StreamingResponse(
+        stream_response(request.message, request.history or []),
+        media_type="text/plain"
+    )

@@ -1,32 +1,35 @@
 from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage
 from dotenv import load_dotenv
 
 load_dotenv()
 
-llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7, streaming=True)
 
-# Chain 1: meal → ingredients
-meal_to_ingredients_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful cooking assistant. Return only valid JSON."),
-    ("human", "Give me the ingredients and step-by-step instructions to make: {meal}. "
-              "Return JSON with keys: meal, ingredients (list), instructions (list).")
-])
-meal_to_ingredients_chain = meal_to_ingredients_prompt | llm | JsonOutputParser()
+system_prompt = """You are a friendly and knowledgeable cooking assistant. Your name is Chef AI.
 
-# Chain 2: ingredients → meals
-ingredients_to_meals_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful cooking assistant. Return only valid JSON."),
-    ("human", "I have these ingredients: {ingredients}. "
-              "What meals can I make? Return JSON with keys: meals (list), descriptions (list).")
-])
-ingredients_to_meals_chain = ingredients_to_meals_prompt | llm | JsonOutputParser()
+You help users with anything related to cooking and food:
+- If they give you a meal name, provide the ingredients and step-by-step instructions
+- If they give you ingredients (in any form — a list, a sentence, a paragraph), suggest meals they can make and how
+- If they ask to be surprised, propose a random interesting meal with full recipe
+- If they just want to chat about food, cooking techniques, nutrition, or kitchen tips, engage naturally
+- If they say hello or start a conversation, introduce yourself warmly and offer what you can do
 
-# Chain 3: propose a random meal 
-meals_and_ingredients_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a creative cooking assistant. Return only valid JSON."),
-    ("human", "Surprise me! Propose one random meal I can make today. "
-              "Return JSON with keys: name (string), ingredients (list), instructions (list).")
+Always detect the language the user is writing in (Arabic, French, or English) and respond in the SAME language.
+If they write in Tunisian dialect (Darija), respond in Tunisian Arabic.
+
+When providing recipes, always structure your response clearly with:
+- The meal name
+- Ingredients list
+- Step by step instructions
+
+Be warm, encouraging, and conversational. You are not a rigid tool — you are a helpful kitchen companion."""
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", system_prompt),
+    MessagesPlaceholder(variable_name="history"),
+    ("human", "{input}")
 ])
-meals_and_ingredients_chain = meals_and_ingredients_prompt | llm | JsonOutputParser()
+
+chat_chain = prompt | llm
