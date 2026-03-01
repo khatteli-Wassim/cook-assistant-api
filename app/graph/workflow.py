@@ -1,40 +1,68 @@
 from langgraph.graph import StateGraph, END
 from app.graph.nodes import (
-    classify_intent,
-    handle_meal_to_ingredients,
-    handle_ingredients_to_meals,
-    propose_meal,
-    format_response
+    route_message,
+    chef_agent,
+    nutritionist_agent,
+    groceries_agent,
+    merge_responses,
 )
 
 def build_graph():
     graph = StateGraph(dict)
 
-    graph.add_node("classify", classify_intent)
-    graph.add_node("meal_to_ingredients", handle_meal_to_ingredients)
-    graph.add_node("ingredients_to_meals", handle_ingredients_to_meals)
-    graph.add_node("propose_meal", propose_meal)
-    graph.add_node("format", format_response)
+    graph.add_node("router", route_message)
+    graph.add_node("chef", chef_agent)
+    graph.add_node("nutritionist", nutritionist_agent)
+    graph.add_node("groceries", groceries_agent)
+    graph.add_node("merge", merge_responses)
 
-    graph.set_entry_point("classify")
+    graph.set_entry_point("router")
 
-    def route_intent(state: dict) -> str:
-        return state["intent"]
+    def route_to_agents(state: dict):
+        agents = state.get("agents", ["chef"])
+        # Return first agent — parallel execution handled by sequential calls
+        return agents[0]
 
     graph.add_conditional_edges(
-        "classify",
-        route_intent,
+        "router",
+        route_to_agents,
         {
-            "meal_to_ingredients": "meal_to_ingredients",
-            "ingredients_to_meals": "ingredients_to_meals",
-            "propose_meal": "propose_meal"
+            "chef": "chef",
+            "nutritionist": "nutritionist",
+            "groceries": "groceries",
         }
     )
 
-    graph.add_edge("meal_to_ingredients", "format")
-    graph.add_edge("ingredients_to_meals", "format")
-    graph.add_edge("propose_meal", "format")
-    graph.add_edge("format", END)
+    # After each agent, check if more agents needed
+    def check_more_agents(state: dict):
+        agents = state.get("agents", [])
+        done = state.get("agents_done", [])
+        remaining = [a for a in agents if a not in done]
+        if len(remaining) > 1:
+            next_agent = remaining[1]
+            state.setdefault("agents_done", []).append(agents[0])
+            return next_agent
+        return "merge"
+
+    graph.add_conditional_edges("chef", check_more_agents, {
+        "nutritionist": "nutritionist",
+        "groceries": "groceries",
+        "merge": "merge"
+    })
+
+    graph.add_conditional_edges("nutritionist", check_more_agents, {
+        "chef": "chef",
+        "groceries": "groceries",
+        "merge": "merge"
+    })
+
+    graph.add_conditional_edges("groceries", check_more_agents, {
+        "chef": "chef",
+        "nutritionist": "nutritionist",
+        "merge": "merge"
+    })
+
+    graph.add_edge("merge", END)
 
     return graph.compile()
 
