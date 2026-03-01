@@ -45,7 +45,9 @@ def route_message(state: dict) -> dict:
 
 def chef_agent(state: dict) -> dict:
     """Handles cooking questions, recipes, meal suggestions."""
-    system = SystemMessage(content="""You are Chef AI, a world-class cooking assistant.
+    system = SystemMessage(content="""IMPORTANT: Always respond in English only, no matter what language the user writes in.
+
+You are Chef AI, a world-class cooking assistant.
 You help with:
 - Recipes and step-by-step cooking instructions
 - Meal suggestions based on available ingredients
@@ -67,7 +69,9 @@ If the user just says hello or starts a conversation, introduce yourself briefly
 
 def nutritionist_agent(state: dict) -> dict:
     """Handles nutrition, calories, macros, healthy eating."""
-    system = SystemMessage(content="""You are a certified nutritionist AI assistant.
+    system = SystemMessage(content="""IMPORTANT: Always respond in English only, no matter what language the user writes in.
+
+You are a certified nutritionist AI assistant.
 You provide detailed nutritional information including:
 - Calories per serving
 - Macronutrients: protein, carbohydrates, fats, fiber
@@ -91,7 +95,7 @@ def groceries_agent(state: dict) -> dict:
     """Extracts ingredients, searches for prices and where to buy them."""
 
     # Step 1: Extract ingredients from conversation
-    extract_system = SystemMessage(content="""You are a helpful assistant.
+    extract_system = SystemMessage(content="""IMPORTANT: Always respond in English only, no matter what language the user writes in.
 Extract all food ingredients mentioned in the user message.
 Return ONLY a plain comma-separated list of ingredients, nothing else.
 Example: chicken breast, olive oil, garlic, tomatoes""")
